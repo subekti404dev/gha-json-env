@@ -29,22 +29,22 @@ echo "$RESPONSE" > env.json
 
 # jq script to flatten JSON with preserved parent path segments
 jq -r --arg style "$INPUT_STYLE" '
-  # Split a raw key segment on common separators to avoid duplicating names
+  # Normalize, split a raw key segment on common separators to avoid duplication
   def split_seg(s):
     s | gsub("[\\.\\-]"; "_") | split("_") | map(select(length>0));
 
   # Convert array of tokens to desired case
-  def to_snake(tokens):
+  def join_snake(tokens):
     tokens | map(ascii_downcase) | join("_");
 
-  def to_camel(tokens):
+  def join_camel(tokens):
     if (tokens|length)==0 then ""
     else
       (tokens[0] | ascii_downcase) +
       (tokens[1:] | map( (.[0:1] | ascii_uppercase) + (.[1:] | ascii_lowercase) ) | join(""))
     end;
 
-  def to_dot(tokens):
+  def join_dot(tokens):
     tokens | map(ascii_downcase) | join(".");
 
   # Format a raw key segment into normalized token array
@@ -53,13 +53,11 @@ jq -r --arg style "$INPUT_STYLE" '
   # Join path array of raw segments according to style
   def join_path(path):
     # Flatten tokens from each raw segment to preserve hierarchy but avoid duplication like host_host
-    if $style == "camel" then
-      (path | map(seg_tokens(.)) | flatten | to_camel)
-    elif $style == "dot" then
-      (path | map(seg_tokens(.)) | flatten | to_dot)
-    else
-      (path | map(seg_tokens(.)) | flatten | to_snake)
-    end;
+    (path | map(seg_tokens(.)) | flatten) as $tokens
+    | if $style == "camel" then join_camel($tokens)
+      elif $style == "dot" then join_dot($tokens)
+      else join_snake($tokens)
+      end;
 
   # Recursive walker producing KEY=VALUE strings
   def walk(obj; path):
