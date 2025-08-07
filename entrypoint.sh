@@ -9,8 +9,7 @@ TOKEN="${3:-}"
 echo "📥 Fetching env.json from $URL"
 
 if [ -n "$TOKEN" ]; then
-  AUTH_HEADER="Authorization: Bearer $TOKEN"
-  curl -sSL --fail -H "$AUTH_HEADER" "$URL" -o env.json || {
+  curl -sSL --fail -H "Authorization: Bearer $TOKEN" "$URL" -o env.json || {
     echo "❌ Failed to download protected JSON"
     exit 1
   }
@@ -30,21 +29,6 @@ jq empty env.json 2>/dev/null || {
 echo "🔧 Flattening with style: $STYLE"
 
 jq -r --arg style "$STYLE" '
-  def flatten($prefix):
-    to_entries[] |
-    if (.value | type) == "object" then
-      (.value | flatten($prefix + format_key(.key) + separator()))
-    elif (.value | type) == "array" then
-      .value | to_entries[] |
-      if (.value | type) == "object" then
-        (.value | flatten($prefix + format_key(.key) + separator() + "\(.key)" + separator()))
-      else
-        "\($prefix)\(format_key(.key))_\(.key)=\(.value|tostring)"
-      end
-    else
-      "\($prefix)\(format_key(.key))=\(.value|tostring)"
-    end;
-
   def format_key(k):
     if $style == "camel" then
       (k | gsub("_"; " ") | split(" ") | .[0] + ([.[1:][] | ascii_upcase] | join("")))
@@ -54,10 +38,23 @@ jq -r --arg style "$STYLE" '
       k
     end;
 
-  def separator():
+  def separator:
     if $style == "dot" then "." else "_" end;
 
-  flatten("")
+  def walk(obj; prefix):
+    if (obj | type) == "object" then
+      obj | to_entries | map(
+        walk(.value; prefix + format_key(.key) + separator)
+      ) | flatten
+    elif (obj | type) == "array" then
+      obj | to_entries | map(
+        walk(.value; prefix + "\(.key)" + separator)
+      ) | flatten
+    else
+      [prefix[:-1] + "=" + (obj|tostring)]
+    end;
+
+  walk(.; "")
 ' env.json | while IFS= read -r line; do
   VAR_NAME="${line%%=*}"
   echo "Setting env: $VAR_NAME"
