@@ -3,10 +3,9 @@
 A GitHub Action that downloads a remote JSON file (public or protected), flattens it into environment variables, and exports them to the GitHub Actions environment (GITHUB_ENV).
 
 - Supports nested objects and arrays
-- Three key styles:
+- Two key styles:
   - snake (default): database_host
   - camel: databaseHost
-  - dot: database.host
 - Optional Bearer token for protected URLs
 
 
@@ -18,7 +17,7 @@ A GitHub Action that downloads a remote JSON file (public or protected), flatten
 
 - style (optional)
   - Key style used when flattening
-  - Allowed values: snake (default), camel, dot
+  - Allowed values: snake (default), camel
 
 - token (optional)
   - Bearer token to access protected endpoints
@@ -52,7 +51,7 @@ Protected JSON with Bearer token:
     token: ${{ secrets.CONFIG_BEARER_TOKEN }}
 ```
 
-Choose key style (camel or dot):
+Choose key style (camel):
 ```yaml
 - name: Load ENV (camelCase keys)
   uses: subekti404dev/gha-json-env@v1
@@ -102,14 +101,6 @@ Output variables:
   - services0Enabled=true
   - services1Name=api
   - services1Enabled=false
-
-- For style: dot
-  - database.host=abc
-  - database.password=1234
-  - services.0.name=auth
-  - services.0.enabled=true
-  - services.1.name=api
-  - services.1.enabled=false
 
 
 ## Notes

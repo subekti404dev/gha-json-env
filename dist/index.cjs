@@ -48,9 +48,6 @@ function splitTokens(seg) {
 function joinSnake(tokens) {
   return tokens.join('_');
 }
-function joinDot(tokens) {
-  return tokens.join('.');
-}
 function joinCamel(tokens) {
   if (tokens.length === 0) return '';
   const [first, ...rest] = tokens;
@@ -63,8 +60,6 @@ function joinPath(segments, style) {
   switch (style) {
     case 'camel':
       return joinCamel(tokens);
-    case 'dot':
-      return joinDot(tokens);
     case 'snake':
     default:
       return joinSnake(tokens);
@@ -106,8 +101,8 @@ async function main() {
   let style = getInput('style', { defaultValue: 'snake' }).toLowerCase();
   const token = getInput('token', { defaultValue: '' });
 
-  if (!['snake', 'camel', 'dot'].includes(style)) {
-    throw new Error(`Invalid style '${style}'. Allowed: snake, camel, dot`);
+  if (!['snake', 'camel'].includes(style)) {
+    throw new Error(`Invalid style '${style}'. Allowed: snake, camel`);
   }
 
   // Mask URL in logs
