@@ -17,5 +17,10 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - run: bash ${{ github.action_path }}/entrypoint.sh "${{ inputs.url }}" "${{ inputs.style }}" "${{ inputs.token }}"
+    - name: Run fetch and flatten
       shell: bash
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_STYLE: ${{ inputs.style }}
+        INPUT_TOKEN: ${{ inputs.token }}
+      run: bash "${{ github.action_path }}/entrypoint.sh"
