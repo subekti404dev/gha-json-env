@@ -29,40 +29,39 @@ echo "$RESPONSE" > env.json
 
 # jq script to flatten JSON with preserved parent path segments
 jq -r --arg style "$INPUT_STYLE" '
-  # Format a single segment according to style
-  def fmt_seg(s):
-    if $style == "camel" then
-      # convert snake_or.dot to camelCase for segment
-      (s
-        | gsub("[\\.\\-_]"; " ")
-        | split(" ")
-        | if length == 0 then "" else
-            (.[0] | ascii_downcase) +
-            (.[1:] | map(ascii_downcase | ascii_upcase[0:0] as $x | .) | map( (.[0:1] | ascii_upcase) + .[1:] ) | join(""))
-          end)
-    elif $style == "dot" then
-      s
+  # Split a raw key segment on common separators to avoid duplicating names
+  def split_seg(s):
+    s | gsub("[\\.\\-]"; "_") | split("_") | map(select(length>0));
+
+  # Convert array of tokens to desired case
+  def to_snake(tokens):
+    tokens | map(ascii_downcase) | join("_");
+
+  def to_camel(tokens):
+    if (tokens|length)==0 then ""
     else
-      # snake: normalize separators to underscore
-      (s | gsub("[\\.\\-]"; "_"))
+      (tokens[0] | ascii_downcase) +
+      (tokens[1:] | map( (.[0:1] | ascii_uppercase) + (.[1:] | ascii_lowercase) ) | join(""))
     end;
 
-  # Join path segments according to style
+  def to_dot(tokens):
+    tokens | map(ascii_downcase) | join(".");
+
+  # Format a raw key segment into normalized token array
+  def seg_tokens(s): split_seg(s) | map(ascii_downcase);
+
+  # Join path array of raw segments according to style
   def join_path(path):
+    # Flatten tokens from each raw segment to preserve hierarchy but avoid duplication like host_host
     if $style == "camel" then
-      # first segment lowerCamel, subsequent start with Upper
-      if (path|length) == 0 then ""
-      else
-        (path[0] | fmt_seg(.)) +
-        ( (path[1:] | map(fmt_seg(.) | (.[0:1] | ascii_upcase) + .[1:]) | join("")) )
-      end
+      (path | map(seg_tokens(.)) | flatten | to_camel)
     elif $style == "dot" then
-      (path | map(fmt_seg(.)) | join("."))
+      (path | map(seg_tokens(.)) | flatten | to_dot)
     else
-      (path | map(fmt_seg(.)) | join("_"))
+      (path | map(seg_tokens(.)) | flatten | to_snake)
     end;
 
-  # Recursive walker producing [ "key" = "value" ] strings
+  # Recursive walker producing KEY=VALUE strings
   def walk(obj; path):
     if (obj | type) == "object" then
       obj
