@@ -27,34 +27,57 @@ echo "🔧 Flattening with style: $INPUT_STYLE"
 # Use a temp file for jq to read
 echo "$RESPONSE" > env.json
 
-# jq script to flatten JSON
+# jq script to flatten JSON with preserved parent path segments
 jq -r --arg style "$INPUT_STYLE" '
-  def format_key(k):
+  # Format a single segment according to style
+  def fmt_seg(s):
     if $style == "camel" then
-      (k | gsub("_"; " ") | split(" ") | .[0] + ([.[1:][] | ascii_upcase] | join("")))
+      # convert snake_or.dot to camelCase for segment
+      (s
+        | gsub("[\\.\\-_]"; " ")
+        | split(" ")
+        | if length == 0 then "" else
+            (.[0] | ascii_downcase) +
+            (.[1:] | map(ascii_downcase | ascii_upcase[0:0] as $x | .) | map( (.[0:1] | ascii_upcase) + .[1:] ) | join(""))
+          end)
     elif $style == "dot" then
-      k
+      s
     else
-      k
+      # snake: normalize separators to underscore
+      (s | gsub("[\\.\\-]"; "_"))
     end;
 
-  def separator:
-    if $style == "dot" then "." else "_" end;
+  # Join path segments according to style
+  def join_path(path):
+    if $style == "camel" then
+      # first segment lowerCamel, subsequent start with Upper
+      if (path|length) == 0 then ""
+      else
+        (path[0] | fmt_seg(.)) +
+        ( (path[1:] | map(fmt_seg(.) | (.[0:1] | ascii_upcase) + .[1:]) | join("")) )
+      end
+    elif $style == "dot" then
+      (path | map(fmt_seg(.)) | join("."))
+    else
+      (path | map(fmt_seg(.)) | join("_"))
+    end;
 
-  def walk(obj; prefix):
+  # Recursive walker producing [ "key" = "value" ] strings
+  def walk(obj; path):
     if (obj | type) == "object" then
-      obj | to_entries | map(
-        walk(.value; prefix + format_key(.key) + separator)
-      ) | flatten
+      obj
+      | to_entries
+      | map( walk(.value; path + [ .key ]) )
+      | flatten
     elif (obj | type) == "array" then
-      obj | to_entries | map(
-        walk(.value; prefix + "\(.key)" + separator)
-      ) | flatten
+      to_entries
+      | map( walk(.value; path + [ (.key|tostring) ]) )
+      | flatten
     else
-      [prefix[:-1] + "=" + (obj|tostring)]
+      [ (join_path(path)) + "=" + (obj|tostring) ]
     end;
 
-  walk(.; "") | .[]
+  walk(.; []) | .[]
 ' env.json | while IFS= read -r line; do
   VAR_NAME="${line%%=*}"
   echo "Setting env: $VAR_NAME"
