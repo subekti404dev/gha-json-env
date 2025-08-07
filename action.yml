@@ -1,0 +1,19 @@
+name: Fetch & Flatten Remote ENV
+description: Download and flatten remote JSON into GitHub ENV
+author: Urip Subekti
+inputs:
+  url:
+    description: Public or protected URL to JSON file
+    required: true
+  style:
+    description: Key style: snake (default), camel, or dot
+    required: false
+    default: snake
+  token:
+    description: Optional Bearer token for Authorization header
+    required: false
+runs:
+  using: "composite"
+  steps:
+    - run: bash ${{ github.action_path }}/entrypoint.sh "${{ inputs.url }}" "${{ inputs.style }}" "${{ inputs.token }}"
+      shell: bash
