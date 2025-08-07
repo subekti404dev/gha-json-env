@@ -1,34 +1,34 @@
 #!/bin/bash
 
-set -euo pipefail
+set -e
 
-URL="$1"
-STYLE="${2:-snake}"
-TOKEN="${3:-}"
+echo "📥 Fetching env.json from $INPUT_URL"
 
-echo "📥 Fetching env.json from $URL"
-
-if [ -n "$TOKEN" ]; then
-  curl -sSL --fail -H "Authorization: Bearer $TOKEN" "$URL" -o env.json || {
-    echo "❌ Failed to download protected JSON"
-    exit 1
-  }
-else
-  curl -sSL --fail "$URL" -o env.json || {
-    echo "❌ Failed to download JSON"
-    exit 1
-  }
+# Prepare headers if token is given
+AUTH_HEADER=""
+if [[ -n "$INPUT_TOKEN" ]]; then
+  AUTH_HEADER="Authorization: Bearer $INPUT_TOKEN"
 fi
 
+# Download and validate JSON
+RESPONSE=$(curl -sSfL -H "$AUTH_HEADER" "$INPUT_URL") || {
+  echo "❌ Failed to fetch JSON from $INPUT_URL"
+  exit 1
+}
+
 echo "🔍 Validating JSON format"
-jq empty env.json 2>/dev/null || {
+echo "$RESPONSE" | jq empty || {
   echo "❌ Invalid JSON format"
   exit 1
 }
 
-echo "🔧 Flattening with style: $STYLE"
+echo "🔧 Flattening with style: $INPUT_STYLE"
 
-jq -r --arg style "$STYLE" '
+# Use a temp file for jq to read
+echo "$RESPONSE" > env.json
+
+# jq script to flatten JSON
+jq -r --arg style "$INPUT_STYLE" '
   def format_key(k):
     if $style == "camel" then
       (k | gsub("_"; " ") | split(" ") | .[0] + ([.[1:][] | ascii_upcase] | join("")))
@@ -54,7 +54,7 @@ jq -r --arg style "$STYLE" '
       [prefix[:-1] + "=" + (obj|tostring)]
     end;
 
-  walk(.; "")
+  walk(.; "") | .[]
 ' env.json | while IFS= read -r line; do
   VAR_NAME="${line%%=*}"
   echo "Setting env: $VAR_NAME"
