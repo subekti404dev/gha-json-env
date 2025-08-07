@@ -118,8 +118,18 @@ async function main() {
     throw new Error('GITHUB_ENV is not set. This action must run in GitHub Actions environment.');
   }
 
+  // Mask token if present
+  if (token) {
+    console.log(`::add-mask::${token}`);
+  }
+
+  // Build env lines while masking values so they are redacted in any future logs
   const lines = pairs.map(([k, v]) => {
     console.log(`Setting env: ${k}`);
+    // Tell GitHub runner to mask this value in all subsequent logs
+    if (v) {
+      console.log(`::add-mask::${v}`);
+    }
     return `${k}=${v}`;
   });
 
